@@ -474,6 +474,8 @@ def main(args):
     logger.info('-' * 100)
     logger.info('Starting training...')
     stats = {'timer': utils.Timer(), 'epoch': 0, 'best_valid': 0}
+    f1_scores = []
+    exact_match_scores = []
     for epoch in range(start_epoch, args.num_epochs):
         stats['epoch'] = epoch
 
@@ -499,8 +501,12 @@ def main(args):
             model.save(args.model_file)
             stats['best_valid'] = result[args.valid_metric]
 
+        f1_scores.append(result['f1'])
+        exact_match_scores.append(result['exact_match'])
 
-if __name__ == '__main__':
+    return f1_scores,exact_match_scores
+
+def train_drqa(cmdline_args, use_cuda=True):
     # Parse cmdline args and setup environment
     parser = argparse.ArgumentParser(
         'DrQA Document Reader',
@@ -508,35 +514,43 @@ if __name__ == '__main__':
     )
     add_train_args(parser)
     config.add_model_args(parser)
-    args = parser.parse_args()
+    args = parser.parse_args(cmdline_args)
     set_defaults(args)
 
     # Set cuda
-    args.cuda = not args.no_cuda and torch.cuda.is_available()
+    # args.cuda = not args.no_cuda and torch.cuda.is_available()
+    args.cuda = use_cuda and torch.cuda.is_available()
     if args.cuda:
+        logger.info('Using GPU')
         torch.cuda.set_device(args.gpu)
+    else:
+        logger.info('Using CPU')
 
+    # NOTE: The code below is commented out because it is done in smallfry utils.
     # Set random state
-    np.random.seed(args.random_seed)
-    torch.manual_seed(args.random_seed)
-    if args.cuda:
-        torch.cuda.manual_seed(args.random_seed)
+    # np.random.seed(args.random_seed)
+    # torch.manual_seed(args.random_seed)
+    # if args.cuda:
+    #     torch.cuda.manual_seed(args.random_seed)
 
     # Set logging
-    logger.setLevel(logging.INFO)
-    fmt = logging.Formatter('%(asctime)s: [ %(message)s ]',
-                            '%m/%d/%Y %I:%M:%S %p')
-    console = logging.StreamHandler()
-    console.setFormatter(fmt)
-    logger.addHandler(console)
-    if args.log_file:
-        if args.checkpoint:
-            logfile = logging.FileHandler(args.log_file, 'a')
-        else:
-            logfile = logging.FileHandler(args.log_file, 'w')
-        logfile.setFormatter(fmt)
-        logger.addHandler(logfile)
-    logger.info('COMMAND: %s' % ' '.join(sys.argv))
+    # logger.setLevel(logging.INFO)
+    # fmt = logging.Formatter('%(asctime)s: [ %(message)s ]',
+    #                         '%m/%d/%Y %I:%M:%S %p')
+    # console = logging.StreamHandler()
+    # console.setFormatter(fmt)
+    # logger.addHandler(console)
+    # if args.log_file:
+    #     if args.checkpoint:
+    #         logfile = logging.FileHandler(args.log_file, 'a')
+    #     else:
+    #         logfile = logging.FileHandler(args.log_file, 'w')
+    #     logfile.setFormatter(fmt)
+    #     logger.addHandler(logfile)
+    # logger.info('COMMAND: %s' % ' '.join(sys.argv))
 
     # Run!
-    main(args)
+    return main(args)
+
+# if __name__ == '__main__':
+#     train_drqa(sys.argv[1:])
