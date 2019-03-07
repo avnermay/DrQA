@@ -21,7 +21,8 @@ from drqa.reader import DocReader
 from drqa import DATA_DIR as DRQA_DATA
 from smallfry import quant_embedding as quant_embed
 
-logger = logging.getLogger()
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------------------
@@ -201,7 +202,7 @@ def init_from_scratch(args, train_exs, dev_exs):
         # assert it is loading from a existing file
         if not args.embedding_file:
             raise IOError("No embedding file specified when using real int based compressed embedding")
-        quant_embed.quantize_embed(model.network, nbit=32)
+        quant_embed.quantize_embed(model.network, nbit=args.nbit)
 
     return model
 
