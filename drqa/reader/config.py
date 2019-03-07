@@ -47,6 +47,13 @@ def add_model_args(parser):
                        help='Number of encoding layers for question')
     model.add_argument('--rnn-type', type=str, default='lstm',
                        help='RNN type: LSTM, GRU, or RNN')
+    # add argument to use quantized embedding layers
+    model.add_argument(
+        '--use-quant-embed',
+        action="store_true",
+        help='Use the compressed implementation (using int storage) for embedding')
+    model.add_argument('--nbit', type=int, default=32,
+        help='Precision for the quantized embeddings')
 
     # Model specific details
     detail = parser.add_argument_group('DrQA Reader Model Details')

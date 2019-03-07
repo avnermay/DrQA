@@ -19,6 +19,7 @@ import logging
 from drqa.reader import utils, vector, config, data
 from drqa.reader import DocReader
 from drqa import DATA_DIR as DRQA_DATA
+from smallfry import quant_embedding as quant_embed
 
 logger = logging.getLogger()
 
@@ -196,6 +197,12 @@ def init_from_scratch(args, train_exs, dev_exs):
     if args.embedding_file:
         model.load_embeddings(word_dict.tokens(), args.embedding_file)
 
+    if args.use_quant_embed:
+        # assert it is loading from a existing file
+        if not args.embedding_file:
+            raise IOError("No embedding file specified when using real int based compressed embedding")
+        quant_embed.quantize_embed(model.network, nbit=32)
+
     return model
 
 
@@ -320,8 +327,8 @@ def eval_accuracies(pred_s, target_s, pred_e, target_e):
     """
     # Convert 1D tensors to lists of lists (compatibility)
     if torch.is_tensor(target_s):
-        target_s = [[e] for e in target_s]
-        target_e = [[e] for e in target_e]
+        target_s = [[e.item()] for e in target_s]
+        target_e = [[e.item()] for e in target_e]
 
     # Compute accuracies from targets
     batch_size = len(pred_s)
@@ -476,6 +483,10 @@ def main(args):
     stats = {'timer': utils.Timer(), 'epoch': 0, 'best_valid': 0}
     f1_scores = []
     exact_match_scores = []
+
+    # Log model parameter status
+    quant_embed.log_param_list(model.network)
+
     for epoch in range(start_epoch, args.num_epochs):
         stats['epoch'] = epoch
 
@@ -552,5 +563,8 @@ def train_drqa(cmdline_args, use_cuda=True):
     # Run!
     return main(args)
 
-# if __name__ == '__main__':
-#     train_drqa(sys.argv[1:])
+if __name__ == '__main__':
+
+    print(sys.argv[1:])
+
+    train_drqa(sys.argv[1:])
