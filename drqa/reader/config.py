@@ -6,7 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 """Model architecture/optimization options for DrQA document reader."""
 
-import argparse
+import argparse 
 import logging
 
 logger = logging.getLogger(__name__)
