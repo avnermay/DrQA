@@ -19,7 +19,7 @@ import logging
 from drqa.reader import utils, vector, config, data
 from drqa.reader import DocReader
 from drqa import DATA_DIR as DRQA_DATA
-from smallfry import quant_embedding as quant_embed
+from smallfry.utils import replace_embeddings, log_param_list
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -130,6 +130,7 @@ def set_defaults(args):
     args.dev_file = os.path.join(args.data_dir, args.dev_file)
     if not os.path.isfile(args.dev_file):
         raise IOError('No such file: %s' % args.dev_file)
+
     if args.embedding_file:
         args.embedding_file = os.path.join(args.embed_dir, args.embedding_file)
         if not os.path.isfile(args.embedding_file):
@@ -194,6 +195,7 @@ def init_from_scratch(args, train_exs, dev_exs):
     # Initialize model
     model = DocReader(config.get_model_args(args), word_dict, feature_dict)
 
+    # The following 2 ifs are for pretrained embeddings
     # Load pretrained embeddings for words in dictionary
     if args.embedding_file:
         model.load_embeddings(word_dict.tokens(), args.embedding_file)
@@ -409,6 +411,21 @@ def main(args):
             logger.info('Training model from scratch...')
             model = init_from_scratch(args, train_exs, dev_exs)
 
+            if args.embed_type == "t3nsor":
+                assert args.t3nsor_d > 0
+                assert args.t3nsor_rank > 0
+                replace_embeddings(model.network, args.embed_type, 
+                    {'d': args.t3nsor_d, 'rank': args.t3nsor_rank})
+                logger.info("swap in t3nsor embeddings")
+            elif args.embed_type == "sparse":
+                logger.exception(args.embed_type + " to be supported for training!")
+                pass
+            elif args.embed_type == "plain":
+                pass
+            else:
+                logger.exception(args.embed_type + " is not supported for training!")
+                raise
+
         # Set up partial tuning of embeddings
         if args.tune_partial > 0:
             logger.info('-' * 100)
@@ -485,11 +502,11 @@ def main(args):
     f1_scores = []
     exact_match_scores = []
 
-    # Log model parameter status
-    quant_embed.log_param_list(model.network)
-
     for epoch in range(start_epoch, args.num_epochs):
         stats['epoch'] = epoch
+        
+        # Log model parameter status
+        log_param_list(model.network, logger)
 
         # Train
         train(args, train_loader, model, stats)
