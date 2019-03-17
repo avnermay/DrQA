@@ -411,20 +411,9 @@ def main(args):
             logger.info('Training model from scratch...')
             model = init_from_scratch(args, train_exs, dev_exs)
 
-            if args.embed_type == "t3nsor":
-                assert args.t3nsor_d > 0
-                assert args.t3nsor_rank > 0
-                replace_embeddings(model.network, args.embed_type, 
-                    {'d': args.t3nsor_d, 'rank': args.t3nsor_rank})
-                logger.info("swap in t3nsor embeddings")
-            elif args.embed_type == "sparse":
-                logger.exception(args.embed_type + " to be supported for training!")
-                pass
-            elif args.embed_type == "plain":
-                pass
-            else:
-                logger.exception(args.embed_type + " is not supported for training!")
-                raise
+            # Jian: replace embeddings if specified by args
+            replace_embeddings(model.network, args, logger)
+
 
         # Set up partial tuning of embeddings
         if args.tune_partial > 0:
