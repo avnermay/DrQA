@@ -21,7 +21,7 @@ from drqa.reader import DocReader
 from drqa import DATA_DIR as DRQA_DATA
 from smallfry.utils import replace_embeddings, log_param_list
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 

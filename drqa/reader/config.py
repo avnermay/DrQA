@@ -97,9 +97,9 @@ def add_model_args(parser):
     optim.add_argument('--embed-type', type=str, default='plain',
                        help='The type of trainable embedding layers',
                        choices=['plain', 't3nsor', 'sparse'])
-    optim.add_argument('--t3nsor_d', type=int, default=0,
+    optim.add_argument('--t3nsor-d', type=int, default=0,
                        help='The number of factors for tensor cores in t3nsor')
-    optim.add_argument('--t3nsor_rank', type=int, default=0,
+    optim.add_argument('--t3nsor-rank', type=int, default=0,
                        help='The rank of the factors')
     optim.add_argument('--tune-partial', type=int, default=0,
                        help='Backprop through only the top N question words')
