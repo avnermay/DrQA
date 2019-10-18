@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------
 
 
-def load_data(args, filename, skip_no_answer=False):
+def load_data(args, filename, skip_no_answer=False, trainset=False):
     pretrainfraction = float(args.pretrainfraction)
     """Load examples from preprocessed file.
     One example per line, JSON encoded.
@@ -44,7 +44,7 @@ def load_data(args, filename, skip_no_answer=False):
     if skip_no_answer:
         examples = [ex for ex in examples if len(ex['answers']) > 0]
     
-    if pretrainfraction != 1.0:
+    if pretrainfraction != 1.0 and trainset:
         return downsample_data(examples, pretrainfraction)
     return examples
 
