@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 # Index of arguments concerning the core model architecture
 MODEL_ARCHITECTURE = {
     'model_type', 'embedding_dim', 'hidden_size', 'doc_layers',
-    'question_layers', 'rnn_type', 'concat_rnn_layers', 'question_merge',
-    'use_qemb', 'use_in_question', 'use_pos', 'use_ner', 'use_lemma', 'use_tf'
+    'question_layers', 'rnn_type', 'use_bert_embeddings', 'bert_model_name',
+    'concat_rnn_layers', 'question_merge', 'use_qemb', 'use_in_question',
+    'use_pos', 'use_ner', 'use_lemma', 'use_tf'
 }
 
 # Index of arguments concerning the model optimizer/training
@@ -47,6 +48,10 @@ def add_model_args(parser):
                        help='Number of encoding layers for question')
     model.add_argument('--rnn-type', type=str, default='lstm',
                        help='RNN type: LSTM, GRU, or RNN')
+    model.add_argument("--use-bert-embeddings", action="store_true",
+                       help="Use last hidden layer activations of pre-trained BERT model as embeddings")
+    model.add_argument("--bert-model-name", type=str, default='bert-base-cased',
+                       help="Name of pre-trained BERT model")
 
     # Model specific details
     detail = parser.add_argument_group('DrQA Reader Model Details')

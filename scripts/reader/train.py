@@ -14,7 +14,7 @@ import os
 import sys
 import subprocess
 import logging
-
+from pytorch_pretrained_bert import BertTokenizer
 
 from drqa.reader import utils, vector, config, data
 from drqa.reader import DocReader
@@ -147,13 +147,14 @@ def set_defaults(args):
     args.model_file = os.path.join(args.model_dir, args.model_name + '.mdl')
 
     # Embeddings options
+    assert args.embedding_file or args.embedding_dim or args.use_bert_embeddings, \
+           'Either embedding_file, embedding_dim, or use_bert_embeddings needs to be specified.'
     if args.embedding_file:
         with open(args.embedding_file) as f:
             dim = len(f.readline().strip().split(' ')) - 1
         args.embedding_dim = dim
-    elif not args.embedding_dim:
-        raise RuntimeError('Either embedding_file or embedding_dim '
-                           'needs to be specified.')
+    if args.use_bert_embeddings:
+        assert args.embedding_dim == 768, 'Must set args.embedding_dim to 768 if using bert embeddings.'
 
     # Make sure tune_partial and fix_embeddings are consistent.
     if args.tune_partial > 0 and args.fix_embeddings:
@@ -432,7 +433,9 @@ def main(args):
     # Two datasets: train and dev. If we sort by length it's faster.
     logger.info('-' * 100)
     logger.info('Make data loaders')
-    train_dataset = data.ReaderDataset(train_exs, model, single_answer=True)
+    bert_tokenizer = (None if not args.use_bert_embeddings else
+                      BertTokenizer.from_pretrained(args.bert_model_name, do_lower_case='uncased' in args.bert_model_name))
+    train_dataset = data.ReaderDataset(train_exs, model, single_answer=True, bert_tokenizer=bert_tokenizer)
     if args.sort_by_len:
         train_sampler = data.SortedBatchSampler(train_dataset.lengths(),
                                                 args.batch_size,
@@ -525,6 +528,8 @@ def train_drqa(cmdline_args, use_cuda=True):
         torch.cuda.set_device(args.gpu)
     else:
         logger.info('Using CPU')
+    if args.use_bert_embeddings:
+        assert args.cuda, 'Must use CUDA if doing BERT training.'
 
     # NOTE: The code below is commented out because it is done in smallfry utils.
     # Set random state

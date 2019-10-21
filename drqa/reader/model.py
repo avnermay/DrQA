@@ -13,7 +13,6 @@ import numpy as np
 import logging
 import copy
 
-from torch.autograd import Variable
 from .config import override_model_args
 from .rnn_reader import RnnDocReader
 
@@ -202,14 +201,13 @@ class DocReader(object):
 
         # Transfer to GPU
         if self.use_cuda:
-            inputs = [e if e is None else Variable(e.cuda(async=True))
-                      for e in ex[:5]]
-            target_s = Variable(ex[5].cuda(async=True))
-            target_e = Variable(ex[6].cuda(async=True))
+            inputs = [e if e is None else e.cuda(non_blocking=True) for e in ex[:5]]
+            target_s = ex[5].cuda(non_blocking=True)
+            target_e = ex[6].cuda(non_blocking=True)
         else:
-            inputs = [e if e is None else Variable(e) for e in ex[:5]]
-            target_s = Variable(ex[5])
-            target_e = Variable(ex[6])
+            inputs = [e if e is None else e for e in ex[:5]]
+            target_s = ex[5]
+            target_e = ex[6]
 
         # Run forward
         score_s, score_e = self.network(*inputs)
@@ -277,12 +275,9 @@ class DocReader(object):
 
         # Transfer to GPU
         if self.use_cuda:
-            inputs = [e if e is None else
-                      Variable(e.cuda(async=True), volatile=True)
-                      for e in ex[:5]]
+            inputs = [e if e is None else e.cuda(non_blocking=True) for e in ex[:5]]
         else:
-            inputs = [e if e is None else Variable(e, volatile=True)
-                      for e in ex[:5]]
+            inputs = [e if e is None else e for e in ex[:5]]
 
         # Run forward
         score_s, score_e = self.network(*inputs)
