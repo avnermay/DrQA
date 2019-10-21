@@ -10,15 +10,41 @@ from collections import Counter
 import torch
 
 
-def vectorize(ex, model, single_answer=False):
+def vectorize(ex, model, single_answer=False, bert_tokenizer=None):
     """Torchify a single example."""
     args = model.args
     word_dict = model.word_dict
     feature_dict = model.feature_dict
 
     # Index words
-    document = torch.LongTensor([word_dict[w] for w in ex['document']])
-    question = torch.LongTensor([word_dict[w] for w in ex['question']])
+    if bert_tokenizer:
+        token_ids = []
+        # stores a '1' at locations that begin a token from the original document/question.
+        # (if a word gets split into 3 sub-tokens, for example, [1,0,0] will get appended to the mask)
+        begin_token_masks = []
+        for data_type in ['document','question']:
+            tokens = []
+            begin_token_mask = []
+            tokens.append('[CLS]')
+            # [CLS] doesn't count as a real token, so mark it as 0 in begin_token_mask
+            begin_token_mask.append(0)
+            for token in ex[data_type]:
+                subtokens = bert_tokenizer.tokenize(token)
+                tokens.extend(subtokens)
+                begin_token_mask.extend([1] + [0]*(len(subtokens)-1))
+            tokens.append('[SEP]')
+            # [SEP] doesn't count as a real token, so mark it as 0 in begin_token_mask
+            begin_token_mask.append(0)
+            ids = bert_tokenizer.convert_tokens_to_ids(tokens)
+            token_ids.append(ids)
+            begin_token_masks.append(begin_token_mask)
+        document = (torch.tensor(token_ids[0], dtype=torch.long),
+                    torch.tensor(begin_token_masks[0], dtype=torch.uint8))
+        question = (torch.tensor(token_ids[1], dtype=torch.long),
+                    torch.tensor(begin_token_masks[1], dtype=torch.uint8))
+    else:
+        document = torch.tensor([word_dict[w] for w in ex['document']], dtype=torch.long)
+        question = torch.tensor([word_dict[w] for w in ex['question']], dtype=torch.long)
 
     # Create extra features vector
     if len(feature_dict) > 0:
@@ -83,45 +109,61 @@ def batchify(batch):
     NUM_EXTRA = 1
 
     ids = [ex[-1] for ex in batch]
-    docs = [ex[0] for ex in batch]
     features = [ex[1] for ex in batch]
-    questions = [ex[2] for ex in batch]
 
-    # Batch documents and features
-    max_length = max([d.size(0) for d in docs])
-    x1 = torch.LongTensor(len(docs), max_length).zero_()
-    x1_mask = torch.ByteTensor(len(docs), max_length).fill_(1)
-    if features[0] is None:
-        x1_f = None
+    use_bert = type(batch[0][0]) is tuple
+    if use_bert:
+        docs = [ex[0][0] for ex in batch]
+        questions = [ex[2][0] for ex in batch]
+        docs_begin_token_masks = [ex[0][1] for ex in batch]
+        questions_begin_token_masks = [ex[2][1] for ex in batch]
     else:
-        x1_f = torch.zeros(len(docs), max_length, features[0].size(1))
-    for i, d in enumerate(docs):
-        x1[i, :d.size(0)].copy_(d)
-        x1_mask[i, :d.size(0)].fill_(0)
-        if x1_f is not None:
-            x1_f[i, :d.size(0)].copy_(features[i])
+        docs = [ex[0] for ex in batch]
+        questions = [ex[2] for ex in batch]
+        docs_begin_token_masks,questions_begin_token_masks = None,None
 
-    # Batch questions
-    max_length = max([q.size(0) for q in questions])
-    x2 = torch.LongTensor(len(questions), max_length).zero_()
-    x2_mask = torch.ByteTensor(len(questions), max_length).fill_(1)
-    for i, q in enumerate(questions):
-        x2[i, :q.size(0)].copy_(q)
-        x2_mask[i, :q.size(0)].fill_(0)
+    # Batch documents and questions
+    assert len(docs) == len(questions)
+    batch_size = len(docs)
+    # x = [{},{}]
+    x = {'docs':{}, 'questions':{}}
+    doc_and_question_batches = [docs, questions]
+    begin_token_masks = [docs_begin_token_masks,questions_begin_token_masks]
+    for j,key in enumerate(x.keys()):
+        doc_or_question_batch = doc_and_question_batches[j]
+        max_length = max([doc_or_question.size(0) for doc_or_question in doc_or_question_batch])
+        x[key]['token_ids']        = torch.zeros(batch_size, max_length, dtype=torch.long)
+        x[key]['mask']             = torch.ones( batch_size, max_length, dtype=torch.uint8)
+        x[key]['features']         = torch.zeros(batch_size, max_length, features[0].size(1)) if (key=='docs') and features[0] is not None else None
+        x[key]['begin_token_mask'] = torch.zeros(batch_size, max_length, dtype=torch.uint8) if use_bert else None
+        for i,doc_or_question in enumerate(doc_or_question_batch):
+            x[key]['token_ids'][i, :doc_or_question.size(0)].copy_(doc_or_question)
+            x[key]['mask'][i, :doc_or_question.size(0)].fill_(0)
+            if x[key]['features'] is not None:
+                x[key]['features'][i, :doc_or_question.size(0)].copy_(features[i])
+            if use_bert:
+                x[key]['begin_token_mask'][i, :doc_or_question.size(0)].copy_(begin_token_masks[j][i])
+
+    if use_bert:
+        # HACK: To not change the number of things returned by this function,
+        # we concatenate the begin_token_masks with the other masks.
+        for key in x.keys():
+            x[key]['mask'] = torch.cat((x[key]['mask'], x[key]['begin_token_mask']))
+            # x[key]['mask'] = x[key]['begin_token_mask']
 
     # Maybe return without targets
     if len(batch[0]) == NUM_INPUTS + NUM_EXTRA:
-        return x1, x1_f, x1_mask, x2, x2_mask, ids
+        return (x['docs']['token_ids'], x['docs']['features'], x['docs']['mask'],
+                x['questions']['token_ids'], x['questions']['mask'], ids)
 
-    elif len(batch[0]) == NUM_INPUTS + NUM_EXTRA + NUM_TARGETS:
-        # ...Otherwise add targets
-        if torch.is_tensor(batch[0][3]):
-            y_s = torch.cat([ex[3] for ex in batch])
-            y_e = torch.cat([ex[4] for ex in batch])
-        else:
-            y_s = [ex[3] for ex in batch]
-            y_e = [ex[4] for ex in batch]
+    # Otherwise return with targets
+    assert len(batch[0]) == NUM_INPUTS + NUM_EXTRA + NUM_TARGETS, 'Incorrect number of inputs per example.'
+    if torch.is_tensor(batch[0][3]):
+        y_s = torch.cat([ex[3] for ex in batch])
+        y_e = torch.cat([ex[4] for ex in batch])
     else:
-        raise RuntimeError('Incorrect number of inputs per example.')
+        y_s = [ex[3] for ex in batch]
+        y_e = [ex[4] for ex in batch]
 
-    return x1, x1_f, x1_mask, x2, x2_mask, y_s, y_e, ids
+    return (x['docs']['token_ids'], x['docs']['features'], x['docs']['mask'],
+            x['questions']['token_ids'], x['questions']['mask'], y_s, y_e, ids)

@@ -87,16 +87,20 @@ class Dictionary(object):
 
 class ReaderDataset(Dataset):
 
-    def __init__(self, examples, model, single_answer=False):
+    def __init__(self, examples, model, single_answer=False, bert_tokenizer=None):
         self.model = model
         self.examples = examples
         self.single_answer = single_answer
+        self.bert_tokenizer = bert_tokenizer
 
     def __len__(self):
         return len(self.examples)
 
     def __getitem__(self, index):
-        return vectorize(self.examples[index], self.model, self.single_answer)
+        return vectorize(self.examples[index],
+                         self.model,
+                         single_answer=self.single_answer,
+                         bert_tokenizer=self.bert_tokenizer)
 
     def lengths(self):
         return [(len(ex['document']), len(ex['question']))
