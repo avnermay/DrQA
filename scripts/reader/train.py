@@ -19,9 +19,10 @@ from pytorch_pretrained_bert import BertTokenizer
 from drqa.reader import utils, vector, config, data
 from drqa.reader import DocReader
 from drqa import DATA_DIR as DRQA_DATA
-from smallfry.utils import replace_embeddings, log_param_list
+# COMMENTED OUT QUANTIZATION/TT SUPPORT
+# from smallfry.utils import replace_embeddings, log_param_list
+# from smallfry import quant_embedding as quant_embed
 
-# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -196,16 +197,16 @@ def init_from_scratch(args, train_exs, dev_exs):
     # Initialize model
     model = DocReader(config.get_model_args(args), word_dict, feature_dict)
 
-    # The following 2 ifs are for pretrained embeddings
     # Load pretrained embeddings for words in dictionary
     if args.embedding_file:
         model.load_embeddings(word_dict.tokens(), args.embedding_file)
 
-    if args.use_quant_embed:
-        # assert it is loading from a existing file
-        if not args.embedding_file:
-            raise IOError("No embedding file specified when using real int based compressed embedding")
-        quant_embed.quantize_embed(model.network, nbit=args.nbit)
+    # COMMENTED OUT QUANTIZATION/TT SUPPORT
+    # if args.use_quant_embed:
+    #     # assert it is loading from a existing file
+    #     if not args.embedding_file:
+    #         raise IOError("No embedding file specified when using real int based compressed embedding")
+    #     quant_embed.quantize_embed(model.network, nbit=args.nbit)
 
     return model
 
@@ -411,9 +412,10 @@ def main(args):
         else:
             logger.info('Training model from scratch...')
             model = init_from_scratch(args, train_exs, dev_exs)
-
-            # Jian: replace embeddings if specified by args
-            replace_embeddings(model.network, args, logger)
+            # COMMENTED OUT QUANTIZATION/TT SUPPORT
+            # if args.embed_type != 'plain':
+            #     # Jian: replace embeddings if specified by args
+            #     replace_embeddings(model.network, args, logger)
 
 
         # Set up partial tuning of embeddings
@@ -497,8 +499,9 @@ def main(args):
     for epoch in range(start_epoch, args.num_epochs):
         stats['epoch'] = epoch
         
+        # COMMENTED OUT QUANTIZATION/TT SUPPORT
         # Log model parameter status
-        log_param_list(model.network, logger)
+        # log_param_list(model.network, logger)
 
         # Train
         train(args, train_loader, model, stats)
@@ -576,7 +579,5 @@ def train_drqa(cmdline_args, use_cuda=True):
     return main(args)
 
 if __name__ == '__main__':
-
     print(sys.argv[1:])
-
     train_drqa(sys.argv[1:])

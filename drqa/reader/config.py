@@ -6,7 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 """Model architecture/optimization options for DrQA document reader."""
 
-import argparse 
+import argparse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,8 +14,11 @@ logger = logging.getLogger(__name__)
 # Index of arguments concerning the core model architecture
 MODEL_ARCHITECTURE = {
     'model_type', 'embedding_dim', 'hidden_size', 'doc_layers', 'question_layers', 'rnn_type',
-    # this row was added by Jian and Avner (first two by Jian, last two by Avner)
-    'use_quant_embed', 'nbit', 'use_bert_embeddings', 'bert_model_name',
+    # COMMENTED OUT QUANTIZATION/TT SUPPORT
+    # # this row of arguments was added by Jian
+    # 'use_quant_embed', 'nbit', 'embed_type', 't3nsor_d', 't3nsor_rank'
+    # this row of arguments was added by Avner
+    'use_bert_embeddings', 'bert_model_name',
     'concat_rnn_layers', 'question_merge', 'use_qemb', 'use_in_question',
     'use_pos', 'use_ner', 'use_lemma', 'use_tf'
 }
@@ -49,11 +52,20 @@ def add_model_args(parser):
                        help='Number of encoding layers for question')
     model.add_argument('--rnn-type', type=str, default='lstm',
                        help='RNN type: LSTM, GRU, or RNN')
-    # Add arguments for using quantized embedding layers (added by Jian)
-    model.add_argument('--use-quant-embed', action="store_true",
-        help='Use the compressed implementation (using int storage) for embedding')
-    model.add_argument('--nbit', type=int, default=32,
-        help='Precision for the quantized embeddings')
+    # COMMENTED OUT QUANTIZATION/TT SUPPORT
+    # # Add arguments for using quantized embedding layers (added by Jian)
+    # model.add_argument('--use-quant-embed', action="store_true",
+    #     help='Use the compressed implementation (using int storage) for embedding')
+    # model.add_argument('--nbit', type=int, default=32,
+    #     help='Precision for the quantized embeddings')
+    # # Add arguments to support TT embeddings (added by Jian)
+    # model.add_argument('--embed-type', type=str, default='plain',
+    #                    help='The type of trainable embedding layers',
+    #                    choices=['plain', 't3nsor', 'sparse'])
+    # model.add_argument('--t3nsor-d', type=int, default=0,
+    #                    help='The number of factors for tensor cores in t3nsor')
+    # model.add_argument('--t3nsor-rank', type=int, default=0,
+    #                    help='The rank of the factors')
     # Add arguments for using BERT embeddings (added by Avner)
     model.add_argument("--use-bert-embeddings", action="store_true",
                        help="Use last hidden layer activations of pre-trained BERT model as embeddings")
@@ -99,13 +111,6 @@ def add_model_args(parser):
                        help='Momentum factor')
     optim.add_argument('--fix-embeddings', type='bool', default=True,
                        help='Keep word embeddings fixed (use pretrained)')
-    optim.add_argument('--embed-type', type=str, default='plain',
-                       help='The type of trainable embedding layers',
-                       choices=['plain', 't3nsor', 'sparse'])
-    optim.add_argument('--t3nsor-d', type=int, default=0,
-                       help='The number of factors for tensor cores in t3nsor')
-    optim.add_argument('--t3nsor-rank', type=int, default=0,
-                       help='The rank of the factors')
     optim.add_argument('--tune-partial', type=int, default=0,
                        help='Backprop through only the top N question words')
     optim.add_argument('--rnn-padding', type='bool', default=False,
