@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_data(args, filename, skip_no_answer=False, trainset=False):
-    pretrainfraction = float(args.pretrainfraction)
+    trainfraction = float(args.trainfraction)
     """Load examples from preprocessed file.
     One example per line, JSON encoded.
     """
@@ -44,30 +44,33 @@ def load_data(args, filename, skip_no_answer=False, trainset=False):
     if skip_no_answer:
         examples = [ex for ex in examples if len(ex['answers']) > 0]
     
-    if pretrainfraction != 1.0 and trainset:
-        return downsample_data(examples, pretrainfraction)
+    if trainfraction != 1.0 and trainset:
+        return downsample_data(examples, trainfraction)
     return examples
 
-def sample(size: int, pretrainfraction: float = 1.0):
+def sample(size, trainfraction):
     import random
 
-    sample_size: int = round(size * pretrainfraction)
+    sample_size = round(size * trainfraction)
     sample = random.sample(range(1, size), sample_size)
     return sample
 
-def downsample_data(examples, pretrainfraction=1.0):
+def downsample_data(examples, trainfraction):
+    import math
+
     # first downsample
+    total_num_examples = len(examples)
     examples_downsampled = [
         examples[i]
-        for i in sample(len(examples), pretrainfraction)
+        for i in sample(total_num_examples, trainfraction)
     ]
-    print("Downsampled to a base of size: " + str(len(examples_downsampled)))
+    logger.info('Downsampled to a base of size: {}'.format(len(examples_downsampled)))
     
-    # so that stopping conditions are unchanged accross different 
-    # downsamplings, recover the dataset size
-    int_multiple = int(1.0/pretrainfraction)
-    examples_downsampled = examples_downsampled * int_multiple
-    print("Final dataset size is: " + str(len(examples_downsampled)))
+    # so that stopping conditions are unchanged across different downsamplings, recover the dataset size.
+    # this code supports trainfractions such that 1/trainfraction is not an integer.
+    int_multiple = math.ceil(1.0/trainfraction)
+    examples_downsampled = (examples_downsampled * int_multiple)[:total_num_examples]
+    logger.info('Final dataset size is:  {}'.format(len(examples_downsampled)))
     return examples_downsampled
 
 def load_text(filename):

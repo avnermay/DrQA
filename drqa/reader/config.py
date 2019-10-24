@@ -117,7 +117,7 @@ def add_model_args(parser):
                        help='Explicitly account for padding in RNN encoding')
     optim.add_argument('--max-len', type=int, default=15,
                        help='The max span allowed during decoding')
-    optim.add_argument('--pretrainfraction', type=float, default=1.0,
+    optim.add_argument('--trainfraction', type=float, default=1.0,
                        help='Amount of task training data to use')
 
 
