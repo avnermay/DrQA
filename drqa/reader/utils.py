@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------
 
 
-def load_data(args, filename, skip_no_answer=False):
+def load_data(args, filename, skip_no_answer=False, trainset=False):
+    pretrainfraction = float(args.pretrainfraction)
     """Load examples from preprocessed file.
     One example per line, JSON encoded.
     """
@@ -42,9 +43,32 @@ def load_data(args, filename, skip_no_answer=False):
     # Skip unparsed (start/end) examples
     if skip_no_answer:
         examples = [ex for ex in examples if len(ex['answers']) > 0]
-
+    
+    if pretrainfraction != 1.0 and trainset:
+        return downsample_data(examples, pretrainfraction)
     return examples
 
+def sample(size: int, pretrainfraction: float = 1.0):
+    import random
+
+    sample_size: int = round(size * pretrainfraction)
+    sample = random.sample(range(1, size), sample_size)
+    return sample
+
+def downsample_data(examples, pretrainfraction=1.0):
+    # first downsample
+    examples_downsampled = [
+        examples[i]
+        for i in sample(len(examples), pretrainfraction)
+    ]
+    print("Downsampled to a base of size: " + str(len(examples_downsampled)))
+    
+    # so that stopping conditions are unchanged accross different 
+    # downsamplings, recover the dataset size
+    int_multiple = int(1.0/pretrainfraction)
+    examples_downsampled = examples_downsampled * int_multiple
+    print("Final dataset size is: " + str(len(examples_downsampled)))
+    return examples_downsampled
 
 def load_text(filename):
     """Load the paragraphs only of a SQuAD dataset. Store as qid -> text."""
