@@ -44,8 +44,8 @@ def load_data(args, filename, skip_no_answer=False, trainset=False):
     if skip_no_answer:
         examples = [ex for ex in examples if len(ex['answers']) > 0]
     
-    if trainfraction != 1.0 and trainset:
-        return downsample_data(examples, trainfraction)
+    if trainfraction < 1.0 and trainset:
+        return downsample(examples, trainfraction)
     return examples
 
 def sample(size, trainfraction):
@@ -55,8 +55,9 @@ def sample(size, trainfraction):
     sample = random.sample(range(1, size), sample_size)
     return sample
 
-def downsample_data(examples, trainfraction):
+def downsample(examples, trainfraction):
     import math
+    assert trainfraction < 1 and trainfraction > 0, 'Should only call downsample with trainfraction between 0 and 1'
 
     # first downsample
     total_num_examples = len(examples)
