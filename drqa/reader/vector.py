@@ -134,13 +134,18 @@ def batchify(batch):
         max_length = max([doc_or_question.size(0) for doc_or_question in doc_or_question_batch])
         x[key]['token_ids']        = torch.zeros(batch_size, max_length, dtype=torch.long)
         x[key]['mask']             = torch.ones( batch_size, max_length, dtype=torch.uint8)
-        x[key]['features']         = torch.zeros(batch_size, max_length, features[0].size(1)) if (key=='docs') and features[0] is not None else None
         x[key]['begin_token_mask'] = torch.zeros(batch_size, max_length, dtype=torch.uint8) if use_bert else None
+        if (key=='docs') and features[0] is not None:
+            max_orig_doc_length = max([doc_features.size(0) for doc_features in features])
+            num_features = features[0].size(1)
+            x[key]['features'] = torch.zeros(batch_size, max_orig_doc_length, num_features)
+        else:
+            x[key]['features'] = None
         for i,doc_or_question in enumerate(doc_or_question_batch):
             x[key]['token_ids'][i, :doc_or_question.size(0)].copy_(doc_or_question)
             x[key]['mask'][i, :doc_or_question.size(0)].fill_(0)
             if x[key]['features'] is not None:
-                x[key]['features'][i, :doc_or_question.size(0)].copy_(features[i])
+                x[key]['features'][i, :features[i].size(0),:].copy_(features[i])
             if use_bert:
                 x[key]['begin_token_mask'][i, :doc_or_question.size(0)].copy_(begin_token_masks[j][i])
 
