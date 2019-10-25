@@ -156,9 +156,7 @@ def set_defaults(args):
     if args.embedding_file:
         with open(args.embedding_file) as f:
             dim = len(f.readline().strip().split(' ')) - 1
-        args.embedding_dim = dim
-    if args.use_bert_embeddings:
-        assert args.embedding_dim == 768, 'Must set args.embedding_dim to 768 if using bert embeddings.'
+        args.embedding_dim = dim        
 
     # Make sure tune_partial and fix_embeddings are consistent.
     if args.tune_partial > 0 and args.fix_embeddings:
@@ -167,10 +165,15 @@ def set_defaults(args):
 
     # Make sure fix_embeddings and embedding_file are consistent
     if args.fix_embeddings:
-        if not (args.embedding_file or args.pretrained):
+        if not (args.embedding_file or args.pretrained or args.use_bert_embeddings):
             logger.warning('WARN: fix_embeddings set to False '
                            'as embeddings are random.')
             args.fix_embeddings = False
+
+    # Make sure embeddings are fixed for BERT training, and that embedding_dim is set properly.
+    if args.use_bert_embeddings:
+        assert args.fix_embeddings, 'Must fix embeddings is using BERT'
+        assert args.embedding_dim == 768, 'Must set args.embedding_dim to 768 if using bert embeddings.'
     return args
 
 
