@@ -172,7 +172,9 @@ class DocReader(object):
         Args:
             state_dict: network parameters
         """
-        if self.args.fix_embeddings:
+        # For BERT embeddings, self.network.embedding will be None, so no
+        # need to set requires_grad=False on these parameters.
+        if self.args.fix_embeddings and self.network.embedding:
             for p in self.network.embedding.parameters():
                 p.requires_grad = False
         parameters = [p for p in self.network.parameters() if p.requires_grad]
