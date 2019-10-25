@@ -18,73 +18,85 @@ def vectorize(ex, model, single_answer=False, bert_tokenizer=None):
 
     # Index words
     if bert_tokenizer:
-        token_ids = []
+        MAX_BERT_INPUT = 512
+        token_ids = {}
         # stores a '1' at locations that begin a token from the original document/question.
         # (if a word gets split into 3 sub-tokens, for example, [1,0,0] will get appended to the mask)
-        begin_token_masks = []
+        begin_token_masks = {}
+        # This stores a potentially truncated version the *original* tokens of the document or question,
+        # such that after BERT tokenization, the length of the BERT subtoken sequence is <= 512.
+        ex_truncated = {}
         for data_type in ['document','question']:
             tokens = []
             begin_token_mask = []
+            truncated = []
             tokens.append('[CLS]')
             # [CLS] doesn't count as a real token, so mark it as 0 in begin_token_mask
             begin_token_mask.append(0)
             for token in ex[data_type]:
                 subtokens = bert_tokenizer.tokenize(token)
+                # include -1 in this if statement because still need to add '[SEP]' token
+                if len(tokens) + len(subtokens) > MAX_BERT_INPUT - 1:
+                    break
                 tokens.extend(subtokens)
+                truncated.append(token)
                 begin_token_mask.extend([1] + [0]*(len(subtokens)-1))
             tokens.append('[SEP]')
+            assert len(tokens) <= MAX_BERT_INPUT
             # [SEP] doesn't count as a real token, so mark it as 0 in begin_token_mask
             begin_token_mask.append(0)
             ids = bert_tokenizer.convert_tokens_to_ids(tokens)
-            token_ids.append(ids)
-            begin_token_masks.append(begin_token_mask)
-        document = (torch.tensor(token_ids[0], dtype=torch.long),
-                    torch.tensor(begin_token_masks[0], dtype=torch.uint8))
-        question = (torch.tensor(token_ids[1], dtype=torch.long),
-                    torch.tensor(begin_token_masks[1], dtype=torch.uint8))
+            token_ids[data_type] = ids
+            begin_token_masks[data_type] = begin_token_mask
+            ex_truncated[data_type] = truncated
+        document = (torch.tensor(token_ids['document'], dtype=torch.long),
+                    torch.tensor(begin_token_masks['document'], dtype=torch.uint8))
+        question = (torch.tensor(token_ids['question'], dtype=torch.long),
+                    torch.tensor(begin_token_masks['question'], dtype=torch.uint8))
     else:
         document = torch.tensor([word_dict[w] for w in ex['document']], dtype=torch.long)
         question = torch.tensor([word_dict[w] for w in ex['question']], dtype=torch.long)
+        ex_truncated = ex
 
+    truncated_doc_length = len(ex_truncated['document'])
     # Create extra features vector
     if len(feature_dict) > 0:
-        features = torch.zeros(len(ex['document']), len(feature_dict))
+        features = torch.zeros(truncated_doc_length, len(feature_dict))
     else:
         features = None
 
     # f_{exact_match}
     if args.use_in_question:
-        q_words_cased = {w for w in ex['question']}
-        q_words_uncased = {w.lower() for w in ex['question']}
+        q_words_cased = {w for w in ex_truncated['question']}
+        q_words_uncased = {w.lower() for w in ex_truncated['question']}
         q_lemma = {w for w in ex['qlemma']} if args.use_lemma else None
-        for i in range(len(ex['document'])):
-            if ex['document'][i] in q_words_cased:
+        for i in range(truncated_doc_length):
+            if ex_truncated['document'][i] in q_words_cased:
                 features[i][feature_dict['in_question']] = 1.0
-            if ex['document'][i].lower() in q_words_uncased:
+            if ex_truncated['document'][i].lower() in q_words_uncased:
                 features[i][feature_dict['in_question_uncased']] = 1.0
             if q_lemma and ex['lemma'][i] in q_lemma:
                 features[i][feature_dict['in_question_lemma']] = 1.0
 
     # f_{token} (POS)
     if args.use_pos:
-        for i, w in enumerate(ex['pos']):
-            f = 'pos=%s' % w
+        for i in range(truncated_doc_length):
+            f = 'pos=%s' % ex['pos'][i]
             if f in feature_dict:
                 features[i][feature_dict[f]] = 1.0
 
     # f_{token} (NER)
     if args.use_ner:
-        for i, w in enumerate(ex['ner']):
-            f = 'ner=%s' % w
+        for i in range(truncated_doc_length):
+            f = 'ner=%s' % ex['ner'][i]
             if f in feature_dict:
                 features[i][feature_dict[f]] = 1.0
 
     # f_{token} (TF)
     if args.use_tf:
-        counter = Counter([w.lower() for w in ex['document']])
-        l = len(ex['document'])
-        for i, w in enumerate(ex['document']):
-            features[i][feature_dict['tf']] = counter[w.lower()] * 1.0 / l
+        counter = Counter([w.lower() for w in ex_truncated['document']])
+        for i, w in enumerate(ex_truncated['document']):
+            features[i][feature_dict['tf']] = counter[w.lower()] * 1.0 / truncated_doc_length
 
     # Maybe return without target
     if 'answers' not in ex:
