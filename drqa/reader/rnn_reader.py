@@ -24,14 +24,15 @@ class RnnDocReader(nn.Module):
         # Store config
         self.args = args
 
+        # Word embeddings (+1 for padding)
+        self.embedding = nn.Embedding(args.vocab_size,
+                                      args.embedding_dim,
+                                      padding_idx=0)
+
         if args.use_bert_embeddings:
             assert args.embedding_dim == 768, 'Must set args.embedding_dim to 768 if using bert embeddings.'
             self.bert_model = BertModel.from_pretrained(args.bert_model_name)
             self.bert_model.eval()
-            self.embedding = None
-        else:
-            # Word embeddings (+1 for padding)
-            self.embedding = nn.Embedding(args.vocab_size, args.embedding_dim, padding_idx=0)
 
         # Projection for attention weighted question
         if args.use_qemb:
@@ -132,7 +133,7 @@ class RnnDocReader(nn.Module):
             #    beginning of a DrQA token.**
             # >> To do this, we take the output from step 3, and extract the embeddings based on the x*_begin_token_masks.
             assert device == torch.device('cuda:0'), 'Must run BERT on GPU'
-            with torch.no_grad():
+            with torch.no_grad:
                 # STEP 1: x*_mask --> x*_bert_mask, x*_begin_token_mask
                 # Recall from vector.batchify that x*_mask = [x*_bert_mask; x*_begin_token_mask] (vertically stacked),
                 # so we extract these two sub-tensors from x*_mask below.
@@ -171,8 +172,8 @@ class RnnDocReader(nn.Module):
                     doc_length = doc_lengths_orig[i].item()
                     question_length = question_lengths_orig[i].item()
                     # get indices of the BERT sub-tokens which correspond to the beginnings of the DrQA tokens.
-                    doc_nz_ind = x1_begin_token_mask[i,:].nonzero().squeeze()
-                    question_nz_ind = x2_begin_token_mask[i,:].nonzero().squeeze()
+                    doc_nz_ind = x1_begin_token_mask[i,:].nonzero()
+                    question_nz_ind = x2_begin_token_mask[i,:].nonzero()
                     # extract the BERT embeddings corresponding to the BERT sub-tokens which begin the DrQA tokens.
                     x1_emb[i,:doc_length,:] = doc_embeddings[i,doc_nz_ind,:]
                     x2_emb[i,:question_length,:] = question_embeddings[i,question_nz_ind,:]

@@ -172,7 +172,7 @@ class DocReader(object):
         Args:
             state_dict: network parameters
         """
-        if self.args.fix_embeddings and self.network.embeddings:
+        if self.args.fix_embeddings:
             for p in self.network.embedding.parameters():
                 p.requires_grad = False
         parameters = [p for p in self.network.parameters() if p.requires_grad]
