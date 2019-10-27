@@ -213,6 +213,17 @@ class DocReader(object):
 
         # Run forward
         score_s, score_e = self.network(*inputs)
+        # score_* is (batch_size) x (# tokens), and target_* is (batch_size)
+        if torch.max(target_e).item() >= score_e.size(1):
+            assert self.args.use_bert_embeddings, 'This should only happen for BERT embeddings'
+            logging.info('The correct span includes truncated words. Example(s) ignored.')
+            # Ignore examples where the correct span includes truncated words.
+            # BERT truncates long documents to stay under the 512 limit.
+            good_ind = target_e < score_e.size(1)
+            target_s = target_s[good_ind]
+            target_e = target_e[good_ind]
+            score_s = score_s[good_ind,:]
+            score_e = score_e[good_ind,:]
 
         # Compute loss and accuracies
         loss = F.nll_loss(score_s, target_s) + F.nll_loss(score_e, target_e)
@@ -232,7 +243,7 @@ class DocReader(object):
         # Reset any partially fixed parameters (e.g. rare words)
         self.reset_parameters()
 
-        return loss.data.item(), ex[0].size(0)
+        return loss.data.item(), target_s.size(0)
 
     def reset_parameters(self):
         """Reset any partially fixed parameters to original states."""
