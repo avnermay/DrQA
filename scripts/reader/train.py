@@ -469,7 +469,7 @@ def main(args):
         collate_fn=vector.batchify,
         pin_memory=args.cuda,
     )
-    dev_dataset = data.ReaderDataset(dev_exs, model, single_answer=False)
+    dev_dataset = data.ReaderDataset(dev_exs, model, single_answer=False, bert_tokenizer=bert_tokenizer)
     if args.sort_by_len:
         dev_sampler = data.SortedBatchSampler(dev_dataset.lengths(),
                                               args.test_batch_size,
